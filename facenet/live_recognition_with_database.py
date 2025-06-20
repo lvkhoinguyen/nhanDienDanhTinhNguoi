@@ -219,7 +219,7 @@ class LiveFaceRecognitionWithDatabase:
             print(f"    {person}: {count} embeddings")
 
 def main():
-    if not os.path.exists("../models/face_database_all.pkl"):
+    if not os.path.exists("../models/face_database_all_v2.pkl"):
         print("Database not found. Creating from trained_cropped folder...")
         from create_database_from_cropped import FaceDatabaseCreator
         creator = FaceDatabaseCreator("../datasets/train_cropped")
