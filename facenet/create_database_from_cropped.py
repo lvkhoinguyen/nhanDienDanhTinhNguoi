@@ -78,7 +78,7 @@ class FaceDatabaseCreator:
             average_embeddings[person] = avg_embedding
         
         # save databases
-        os.makedirs('models', exist_ok=True)
+        os.makedirs('../models', exist_ok=True)
         
         # save all individual embeddings
         database = {
