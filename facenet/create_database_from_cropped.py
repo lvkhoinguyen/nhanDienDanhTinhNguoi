@@ -86,7 +86,7 @@ class FaceDatabaseCreator:
             'names': all_names,
             'classes': dataset.classes
         }
-        with open('../models/face_database_all.pkl', 'wb') as f:
+        with open('../models/face_database_all_v2.pkl', 'wb') as f:
             pickle.dump(database, f)
         
         # save average embeddings (smaller, faster for recognition)
@@ -95,7 +95,7 @@ class FaceDatabaseCreator:
             'names': list(average_embeddings.keys()),
             'classes': dataset.classes
         }
-        with open('../models/face_database_avg.pkl', 'wb') as f:
+        with open('../models/face_database_avg_v2.pkl', 'wb') as f:
             pickle.dump(avg_database, f)
         
         # save detailed embeddings per person
@@ -104,7 +104,7 @@ class FaceDatabaseCreator:
             'average_embeddings': average_embeddings,
             'classes': dataset.classes
         }
-        with open('../models/face_database_detailed.pkl', 'wb') as f:
+        with open('../models/face_database_detailed_v2.pkl', 'wb') as f:
             pickle.dump(detailed_database, f)
         
         print("\n✅ Database created successfully!")
