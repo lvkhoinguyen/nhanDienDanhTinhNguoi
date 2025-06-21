@@ -204,8 +204,8 @@ class LiveFaceRecognitionWithDatabase:
     def run_live_test(self, threshold=0.85, camera_id=0):
         """Run live face recognition test"""
         cap = cv2.VideoCapture(camera_id)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 960)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         
         print("🎥 Starting live face recognition test...")
         print("Controls:")
