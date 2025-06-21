@@ -30,6 +30,10 @@ class LiveFaceRecognitionWithDatabase:
         ).to(self.device)
         self.resnet.eval()
         
+        # for smoothing values
+        self.smoothing_buffer = {}
+        self.buffer_size = 5
+        
         # load face database
         self.load_database(database_path)
         
@@ -63,6 +67,30 @@ class LiveFaceRecognitionWithDatabase:
                 face_tensor = face_tensor.unsqueeze(0)
             embedding = self.resnet(face_tensor)
             return embedding.cpu().numpy().flatten()
+    
+    def smooth_values(self, face_id, distance, confidence):
+        """Smooth distance and confidence values over time"""
+        if face_id not in self.smoothing_buffer:
+            self.smoothing_buffer[face_id] = {
+                'distances': [],
+                'confidences': []
+            }
+        
+        buffer = self.smoothing_buffer[face_id]
+        
+        buffer['distances'].append(distance)
+        buffer['confidences'].append(confidence)
+        
+        if len(buffer['distances']) > self.buffer_size:
+            buffer['distances'] = buffer['distances'][-self.buffer_size:]
+        if len(buffer['confidences']) > self.buffer_size:
+            buffer['confidences'] = buffer['confidences'][-self.buffer_size:]
+        
+        # Return smoothed values
+        smooth_distance = sum(buffer['distances']) / len(buffer['distances'])
+        smooth_confidence = sum(buffer['confidences']) / len(buffer['confidences'])
+        
+        return smooth_distance, smooth_confidence
     
     def recognize_face(self, face_tensor, threshold=1.0):
         """Recognize face using the loaded database"""
@@ -104,11 +132,16 @@ class LiveFaceRecognitionWithDatabase:
                         name, distance = self.recognize_face(face_tensor, threshold)
                         left, top, right, bottom = box.astype(int)
                         
+                        face_id = f"{left//50}_{top//50}"  # Grid-based ID for tracking
+                        
+                        confidence = probs[i] if probs is not None else 0.0
+                        smooth_distance, smooth_confidence = self.smooth_values(face_id, distance, confidence)
+                        
                         results.append({
                             'box': (left, top, right, bottom),
                             'name': name,
-                            'distance': distance,
-                            'confidence': probs[i] if probs is not None else 0.0
+                            'distance': smooth_distance,
+                            'confidence': smooth_confidence
                         })
         
         except Exception as e:
@@ -122,26 +155,49 @@ class LiveFaceRecognitionWithDatabase:
             left, top, right, bottom = result['box']
             name = result['name']
             distance = result['distance']
+            confidence = result['confidence']
             
-            # Color coding
+            # adaptive color coding based on probability and recognition
             if name == "Unknown":
-                color = (0, 0, 255)  # Red
+                # red shades for unknown faces, darker red for lower confidence
+                red_intensity = int(255 * max(0.3, confidence))
+                color = (0, 0, red_intensity)
             else:
-                color = (0, 255, 0)  # Green
+                # green-yellow-red gradient for known faces based on probability
+                if confidence >= 0.8:
+                    color = (0, 255, 0)
+                elif confidence >= 0.6:
+                    green = int(255 * confidence)
+                    color = (0, green, 128)
+                elif confidence >= 0.4:
+                    red = int(255 * (1 - confidence + 0.5))
+                    green = int(128 * confidence)
+                    color = (0, green, red)
+                else:
+                    # very low confidence: Red
+                    color = (0, 64, 255)
             
-            # Draw bounding box
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             
-            # Create label
-            label = f"{name} ({distance:.2f})"
+            label = f"{name}"
+            prob_label = f"Prob: {confidence:.2f}"
             
-            # Draw label background
-            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-            cv2.rectangle(frame, (left, top - 25), (left + label_size[0], top), color, -1)
+            # draw main label background (smaller now)
+            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            cv2.rectangle(frame, (left, top - 45), (left + max(label_size[0], 120), top), color, -1)
             
-            # Draw label text
-            cv2.putText(frame, label, (left, top - 5), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            # draw name (larger font)
+            cv2.putText(frame, label, (left + 2, top - 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            # draw detection probability (larger font)
+            cv2.putText(frame, prob_label, (left + 2, top - 5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            
+            # draw distance in bottom-right corner of bounding box (smaller, less prominent)
+            distance_label = f"{distance:.2f}"
+            cv2.putText(frame, distance_label, (right - 50, bottom - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
         
         return frame
     
