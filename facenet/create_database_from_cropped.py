@@ -8,7 +8,7 @@ from torchvision import datasets, transforms
 
 
 class FaceDatabaseCreator:
-    def __init__(self, cropped_data_path="../datasets/train_cropped"):
+    def __init__(self, cropped_data_path="../datasets/train_augmented"):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.cropped_data_path = cropped_data_path
         
@@ -120,8 +120,8 @@ class FaceDatabaseCreator:
         return database, avg_database, detailed_database
 
 def main():
-    creator = FaceDatabaseCreator("../datasets/train_cropped")
-    creator.create_database(samples_per_person=100)
+    creator = FaceDatabaseCreator("../datasets/train_augmented")
+    creator.create_database(samples_per_person=200)
 
 if __name__ == "__main__":
     main()
