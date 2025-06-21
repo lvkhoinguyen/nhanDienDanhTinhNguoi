@@ -113,9 +113,9 @@ class FaceDatabaseCreator:
         print(f"  - Total embeddings: {len(all_embeddings)}")
         print(f"  - Average embeddings per person: {len(all_embeddings) / len(dataset.classes):.1f}")
         print("\n💾 Saved files:")
-        print("  - models/face_database_all.pkl (all embeddings)")
-        print("  - models/face_database_avg.pkl (average embeddings)")
-        print("  - models/face_database_detailed.pkl (detailed data)")
+        print("  - models/face_database_all_v2.pkl (all embeddings)")
+        print("  - models/face_database_avg_v2.pkl (average embeddings)")
+        print("  - models/face_database_detailed_v2.pkl (detailed data)")
         
         return database, avg_database, detailed_database
 
