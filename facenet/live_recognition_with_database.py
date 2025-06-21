@@ -68,6 +68,18 @@ class LiveFaceRecognitionWithDatabase:
             embedding = self.resnet(face_tensor)
             return embedding.cpu().numpy().flatten()
     
+    def distance_to_probability(self, distance, threshold=1.0):
+        """Convert distance to probability-like score (0-1)"""
+        if distance >= threshold * 2:
+            return 0.0  # Very poor match
+        elif distance <= 0.1:
+            return 1.0  # Perfect match
+        else:
+            # Convert distance to probability: closer to 0 = higher probability
+            # Use exponential decay for more intuitive scaling
+            prob = max(0.0, 1.0 - (distance / threshold))
+            return min(1.0, prob)
+    
     def smooth_values(self, face_id, distance, confidence):
         """Smooth distance and confidence values over time"""
         if face_id not in self.smoothing_buffer:
@@ -134,14 +146,18 @@ class LiveFaceRecognitionWithDatabase:
                         
                         face_id = f"{left//50}_{top//50}"  # Grid-based ID for tracking
                         
+                        # Convert distance to recognition probability
+                        recognition_prob = self.distance_to_probability(distance, threshold)
+                        
+                        # Smooth the values (using recognition probability instead of detection confidence)
                         confidence = probs[i] if probs is not None else 0.0
-                        smooth_distance, smooth_confidence = self.smooth_values(face_id, distance, confidence)
+                        smooth_distance, smooth_recognition_prob = self.smooth_values(face_id, distance, recognition_prob)
                         
                         results.append({
                             'box': (left, top, right, bottom),
                             'name': name,
                             'distance': smooth_distance,
-                            'confidence': smooth_confidence
+                            'confidence': smooth_recognition_prob  # Now this is recognition probability
                         })
         
         except Exception as e:
@@ -180,7 +196,7 @@ class LiveFaceRecognitionWithDatabase:
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             
             label = f"{name}"
-            prob_label = f"Prob: {confidence:.2f}"
+            prob_label = f"Recog: {confidence:.2f}"
             
             # draw main label background (smaller now)
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
