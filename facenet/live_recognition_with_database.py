@@ -146,18 +146,14 @@ class LiveFaceRecognitionWithDatabase:
                         
                         face_id = f"{left//50}_{top//50}"  # Grid-based ID for tracking
                         
-                        # Convert distance to recognition probability
-                        recognition_prob = self.distance_to_probability(distance, threshold)
-                        
-                        # Smooth the values (using recognition probability instead of detection confidence)
-                        confidence = probs[i] if probs is not None else 0.0
-                        smooth_distance, smooth_recognition_prob = self.smooth_values(face_id, distance, recognition_prob)
+                        # Smooth the distance values
+                        detection_confidence = probs[i] if probs is not None else 0.0
+                        smooth_distance, _ = self.smooth_values(face_id, distance, detection_confidence)
                         
                         results.append({
                             'box': (left, top, right, bottom),
                             'name': name,
-                            'distance': smooth_distance,
-                            'confidence': smooth_recognition_prob  # Now this is recognition probability
+                            'distance': smooth_distance
                         })
         
         except Exception as e:
@@ -171,49 +167,37 @@ class LiveFaceRecognitionWithDatabase:
             left, top, right, bottom = result['box']
             name = result['name']
             distance = result['distance']
-            confidence = result['confidence']
             
-            # adaptive color coding based on probability and recognition
+            # Color coding based on distance thresholds - more meaningful than probability
             if name == "Unknown":
-                # red shades for unknown faces, darker red for lower confidence
-                red_intensity = int(255 * max(0.3, confidence))
-                color = (0, 0, red_intensity)
+                color = (0, 0, 255)  # Red for unknown
             else:
-                # green-yellow-red gradient for known faces based on probability
-                if confidence >= 0.8:
-                    color = (0, 255, 0)
-                elif confidence >= 0.6:
-                    green = int(255 * confidence)
-                    color = (0, green, 128)
-                elif confidence >= 0.4:
-                    red = int(255 * (1 - confidence + 0.5))
-                    green = int(128 * confidence)
-                    color = (0, green, red)
+                # Distance-based color coding for known faces
+                if distance <= 0.6:
+                    color = (0, 255, 0)      # Green - excellent match
+                elif distance <= 0.8:
+                    color = (0, 255, 255)    # Yellow - good match  
+                elif distance <= 1.0:
+                    color = (0, 165, 255)    # Orange - fair match
                 else:
-                    # very low confidence: Red
-                    color = (0, 64, 255)
+                    color = (0, 100, 255)    # Red-orange - poor match
             
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             
             label = f"{name}"
-            prob_label = f"Recog: {confidence:.2f}"
+            distance_label = f"Dist: {distance:.2f}"
             
-            # draw main label background (smaller now)
+            # draw main label background
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
             cv2.rectangle(frame, (left, top - 45), (left + max(label_size[0], 120), top), color, -1)
             
-            # draw name (larger font)
+            # draw name
             cv2.putText(frame, label, (left + 2, top - 25), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
-            # draw detection probability (larger font)
-            cv2.putText(frame, prob_label, (left + 2, top - 5), 
+            # draw distance instead of probability
+            cv2.putText(frame, distance_label, (left + 2, top - 5), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-            
-            # draw distance in bottom-right corner of bounding box (smaller, less prominent)
-            distance_label = f"{distance:.2f}"
-            cv2.putText(frame, distance_label, (right - 50, bottom - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
         
         return frame
     
