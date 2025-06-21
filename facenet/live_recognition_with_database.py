@@ -16,7 +16,7 @@ class LiveFaceRecognitionWithDatabase:
             image_size=160, 
             margin=40,
             min_face_size=20,
-            thresholds=[0.6, 0.7, 0.7], 
+            thresholds=[0.7, 0.8, 0.8], 
             factor=0.709, 
             post_process=True,
             device=self.device,
@@ -68,7 +68,7 @@ class LiveFaceRecognitionWithDatabase:
             embedding = self.resnet(face_tensor)
             return embedding.cpu().numpy().flatten()
     
-    def distance_to_probability(self, distance, threshold=1.0):
+    def distance_to_probability(self, distance, threshold=0.85):
         """Convert distance to probability-like score (0-1)"""
         if distance >= threshold * 2:
             return 0.0  # Very poor match
@@ -104,7 +104,7 @@ class LiveFaceRecognitionWithDatabase:
         
         return smooth_distance, smooth_confidence
     
-    def recognize_face(self, face_tensor, threshold=1.0):
+    def recognize_face(self, face_tensor, threshold=0.85):
         """Recognize face using the loaded database"""
         if face_tensor is None or len(self.known_embeddings) == 0:
             return "Unknown", 999.0
@@ -126,7 +126,7 @@ class LiveFaceRecognitionWithDatabase:
         else:
             return "Unknown", min_distance
     
-    def process_frame(self, frame, threshold=1.0):
+    def process_frame(self, frame, threshold=0.85):
         """Process frame for face recognition"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb_frame)
@@ -201,7 +201,7 @@ class LiveFaceRecognitionWithDatabase:
         
         return frame
     
-    def run_live_test(self, threshold=1.0, camera_id=0):
+    def run_live_test(self, threshold=0.85, camera_id=0):
         """Run live face recognition test"""
         cap = cv2.VideoCapture(camera_id)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -282,7 +282,7 @@ def main():
         creator.create_database()
     
     recognizer = LiveFaceRecognitionWithDatabase()
-    recognizer.run_live_test(threshold=1.0)
+    recognizer.run_live_test(threshold=0.85)
 
 if __name__ == "__main__":
     import os
