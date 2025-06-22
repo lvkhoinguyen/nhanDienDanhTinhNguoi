@@ -34,6 +34,9 @@ class LiveFaceRecognitionWithDatabase:
         self.smoothing_buffer = {}
         self.buffer_size = 5
         
+        # debug flags
+        self.debug_duplicates = False
+        
         # load face database
         self.load_database(database_path)
         
@@ -131,7 +134,7 @@ class LiveFaceRecognitionWithDatabase:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb_frame)
         
-        results = []
+        raw_results = []
         
         try:
             boxes, probs = self.mtcnn.detect(pil_image)
@@ -150,7 +153,7 @@ class LiveFaceRecognitionWithDatabase:
                         detection_confidence = probs[i] if probs is not None else 0.0
                         smooth_distance, _ = self.smooth_values(face_id, distance, detection_confidence)
                         
-                        results.append({
+                        raw_results.append({
                             'box': (left, top, right, bottom),
                             'name': name,
                             'distance': smooth_distance
@@ -159,7 +162,48 @@ class LiveFaceRecognitionWithDatabase:
         except Exception as e:
             print(f"Error processing frame: {e}")
         
-        return results
+        # Filter duplicate person assignments - keep only the best match for each person
+        return self.filter_duplicate_assignments(raw_results)
+    
+    def filter_duplicate_assignments(self, results):
+        """Filter out duplicate person assignments, keeping only the most accurate match"""
+        if not results:
+            return results
+        
+        # Group results by person name
+        person_groups = {}
+        unknown_results = []
+        
+        for result in results:
+            name = result['name']
+            if name == "Unknown":
+                unknown_results.append(result)
+            else:
+                if name not in person_groups:
+                    person_groups[name] = []
+                person_groups[name].append(result)
+        
+        # For each person, keep only the result with the lowest distance (best match)
+        filtered_results = []
+        
+        for name, group in person_groups.items():
+            if len(group) == 1:
+                # Only one detection for this person, keep it
+                filtered_results.append(group[0])
+            else:
+                # Multiple detections for same person, keep the best one
+                best_result = min(group, key=lambda x: x['distance'])
+                filtered_results.append(best_result)
+                
+                # Debug info for duplicate detection
+                if self.debug_duplicates:
+                    distances = [f"{r['distance']:.2f}" for r in group]
+                    print(f"🔍 Multiple faces detected for {name} (distances: {', '.join(distances)}), keeping best: {best_result['distance']:.2f}")
+        
+        # Add all unknown results (these are different unknown faces)
+        filtered_results.extend(unknown_results)
+        
+        return filtered_results
     
     def draw_results(self, frame, results):
         """Draw recognition results on frame"""
@@ -184,19 +228,27 @@ class LiveFaceRecognitionWithDatabase:
             
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             
+            # Calculate confidence percentage for display
+            confidence = max(0, min(100, (1.0 - distance) * 100)) if name != "Unknown" else 0
+            
             label = f"{name}"
-            distance_label = f"Dist: {distance:.2f}"
+            if name != "Unknown":
+                detail_label = f"Dist: {distance:.2f} | Conf: {confidence:.0f}%"
+            else:
+                detail_label = f"Dist: {distance:.2f}"
             
             # draw main label background
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-            cv2.rectangle(frame, (left, top - 45), (left + max(label_size[0], 120), top), color, -1)
+            detail_size = cv2.getTextSize(detail_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+            bg_width = max(label_size[0], detail_size[0]) + 4
+            cv2.rectangle(frame, (left, top - 45), (left + bg_width, top), color, -1)
             
             # draw name
             cv2.putText(frame, label, (left + 2, top - 25), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
-            # draw distance instead of probability
-            cv2.putText(frame, distance_label, (left + 2, top - 5), 
+            # draw distance and confidence
+            cv2.putText(frame, detail_label, (left + 2, top - 5), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         
         return frame
@@ -213,6 +265,7 @@ class LiveFaceRecognitionWithDatabase:
         print("  '+' - Increase threshold (less strict)")
         print("  '-' - Decrease threshold (more strict)")
         print("  'i' - Show database info")
+        print("  'd' - Toggle duplicate filtering debug info")
         
         frame_count = 0
         fps_start_time = time.time()
@@ -261,6 +314,9 @@ class LiveFaceRecognitionWithDatabase:
                 print(f"Threshold: {threshold:.2f}")
             elif key == ord('i'):
                 self.show_database_info()
+            elif key == ord('d'):
+                self.debug_duplicates = not self.debug_duplicates
+                print(f"Duplicate filtering debug: {'ON' if self.debug_duplicates else 'OFF'}")
         
         cap.release()
         cv2.destroyAllWindows()
